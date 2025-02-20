@@ -1,0 +1,60 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "YouTube Transcript Retrieval API",
+    "description": "Fetches all YouTube transcripts stored in Google Drive for CustomGPT.",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://youtube-transcripts-bot.onrender.com",
+      "description": "Production Server"
+    }
+  ],
+  "paths": {
+    "/fetch_transcripts": {
+      "get": {
+        "operationId": "fetch_transcripts",
+        "summary": "Fetches all YouTube transcripts from a Google Drive folder",
+        "description": "Retrieves all transcript content from Google Docs stored in a specified Google Drive folder.",
+        "parameters": [
+          {
+            "name": "folder_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The Google Drive folder ID containing the transcripts."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of transcripts retrieved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "document_id": { "type": "string" },
+                      "document_name": { "type": "string" },
+                      "content": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid folder ID."
+          },
+          "500": {
+            "description": "Server error while retrieving transcripts."
+          }
+        }
+      }
+    }
+  }
+}
