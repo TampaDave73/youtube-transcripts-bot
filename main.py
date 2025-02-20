@@ -69,6 +69,7 @@ def extract_video_id(url):
         logging.error(f"Could not extract video ID from URL: {url}")
         return None
 
+logging.info("Using yt_dlp for video info retrieval")
 def get_video_info(url):
     """
     Use yt_dlp to get video title and channel (uploader) name.
