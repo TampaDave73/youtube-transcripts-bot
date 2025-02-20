@@ -74,3 +74,17 @@ def home():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
+@app.route("/fetch_transcripts", methods=["GET"])
+def fetch_transcripts():
+    """API endpoint to get all Google Docs from a folder for CustomGPT."""
+    folder_id = request.args.get("folder_id")
+
+    # Log the request for debugging
+    print(f"Received request from OpenAI: folder_id={folder_id}")
+
+    if not folder_id:
+        return jsonify({"error": "Missing folder ID"}), 400
+
+    docs = get_all_docs_from_folder(folder_id)
+    return jsonify(docs)
