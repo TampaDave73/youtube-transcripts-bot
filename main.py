@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 This script reads a Google Sheet for new YouTube URLs, retrieves the video transcript,
-title, and channel name, creates a Google Doc for each video, and then marks the URL as processed.
+title, and channel name (using yt_dlp), creates a Google Doc for each video, and then marks the URL as processed.
 """
 
 import os
@@ -10,7 +10,6 @@ import re
 import logging
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from pytube import YouTube
 from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
 
 # Set up logging for progress and errors
@@ -19,38 +18,27 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 # ---------------------------
 # Configuration Constants
 # ---------------------------
-
-# Replace with your actual Google Sheet ID
 SPREADSHEET_ID = '1KoOcdDRp1vSDaPhOlw9MJxBe44-6vjFcCP3ZJ8qtw8k'
-# Replace with your actual sheet name (e.g., "Sheet1")
 SHEET_NAME = 'URL'
-# Column indices (0-indexed): Column A = URL, Column B = Processed marker
 URL_COLUMN_INDEX = 0
 PROCESSED_COLUMN_INDEX = 1
-
-# Replace with your Google Drive folder ID where new Docs should be stored.
 DOCS_FOLDER_ID = '16ZJiuP2PFNn8qeZ9wgscBP9PGh0j2xfo'
 
 # ---------------------------
 # Google API Authentication
 # ---------------------------
-
-# Define the scopes required for Sheets, Docs, and Drive
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/documents",
     "https://www.googleapis.com/auth/drive"
 ]
 
-# Try to load credentials from the SERVICE_ACCOUNT_JSON environment variable.
-# This is used when running on Render or GitHub Actions.
 service_account_json = os.environ.get("SERVICE_ACCOUNT_JSON")
 if service_account_json:
     creds = service_account.Credentials.from_service_account_info(
         json.loads(service_account_json), scopes=SCOPES
     )
 else:
-    # Fallback for local testing: read the JSON file from disk.
     SERVICE_ACCOUNT_FILE = 'service_account.json'
     creds = service_account.Credentials.from_service_account_file(
         SERVICE_ACCOUNT_FILE, scopes=SCOPES
@@ -59,8 +47,6 @@ else:
 # ---------------------------
 # Setup Google API Clients
 # ---------------------------
-
-# Build service objects for Sheets, Docs, and Drive
 sheets_service = build('sheets', 'v4', credentials=creds)
 docs_service = build('docs', 'v1', credentials=creds)
 drive_service = build('drive', 'v3', credentials=creds)
@@ -68,11 +54,9 @@ drive_service = build('drive', 'v3', credentials=creds)
 # ---------------------------
 # Helper Functions
 # ---------------------------
-
 def extract_video_id(url):
     """
     Extract the YouTube video ID from a URL.
-    Supports typical YouTube URL formats.
     """
     pattern = r"(?:v=|\/)([0-9A-Za-z_-]{11}).*"
     match = re.search(pattern, url)
@@ -86,22 +70,26 @@ def extract_video_id(url):
 
 def get_video_info(url):
     """
-    Use pytube to get video title and channel (author) name.
+    Use yt_dlp to get video title and channel (uploader) name.
     """
     try:
-        yt = YouTube(url)
-        title = yt.title
-        channel = yt.author
-        logging.info(f"Retrieved video info - Title: {title}, Channel: {channel}")
-        return title, channel
+        import yt_dlp
+        ydl_opts = {'quiet': True, 'no_warnings': True}
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            title = info.get('title')
+            channel = info.get('uploader')
+            logging.info(f"Retrieved video info - Title: {title}, Channel: {channel}")
+            return title, channel
     except Exception as e:
-        logging.error(f"Error retrieving video info for {url}: {e}")
+        error_message = f"Error retrieving video info for {url}: {e}"
+        logging.error(error_message)
+        print(error_message)
         return None, None
 
 def get_transcript(video_id):
     """
     Retrieve the transcript text for the given YouTube video ID.
-    Combines transcript parts into one string.
     """
     try:
         transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
@@ -124,13 +112,11 @@ def create_google_doc(doc_title, content):
     Then move the document into the designated folder.
     """
     try:
-        # Create a new document with the title
         doc_body = {'title': doc_title}
         doc = docs_service.documents().create(body=doc_body).execute()
         doc_id = doc.get('documentId')
         logging.info(f"Created Google Doc with ID: {doc_id}")
 
-        # Insert the content into the document
         requests = [
             {
                 'insertText': {
@@ -142,7 +128,6 @@ def create_google_doc(doc_title, content):
         docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute()
         logging.info("Content inserted into the document.")
 
-        # Move the document into the designated folder
         file = drive_service.files().get(fileId=doc_id, fields='parents').execute()
         previous_parents = ",".join(file.get('parents'))
         drive_service.files().update(
@@ -160,7 +145,6 @@ def create_google_doc(doc_title, content):
 def update_sheet_row(row_index, status):
     """
     Update a specific row in the Google Sheet to mark it as processed.
-    'row_index' is 0-indexed for our local list; the Sheets API uses 1-indexing including header.
     """
     try:
         cell = f"{chr(ord('A') + PROCESSED_COLUMN_INDEX)}{row_index + 2}"
@@ -177,8 +161,8 @@ def update_sheet_row(row_index, status):
 
 def process_sheet():
     """
-    Main function to process the Google Sheet.
-    Reads all rows, checks for unprocessed URLs, processes them, and updates the sheet.
+    Process the Google Sheet: for each unprocessed URL, retrieve video info, transcript,
+    create a Google Doc, and mark the row accordingly.
     """
     try:
         range_name = f"{SHEET_NAME}!A:B"
@@ -229,10 +213,6 @@ def process_sheet():
                 update_sheet_row(index, "Error: Doc creation failed")
     except Exception as e:
         logging.error(f"Error processing sheet: {e}")
-
-# ---------------------------
-# Main Execution
-# ---------------------------
 
 if __name__ == "__main__":
     logging.info("Starting processing of Google Sheet...")
