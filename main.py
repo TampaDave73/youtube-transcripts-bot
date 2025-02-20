@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 This script reads a Google Sheet for new YouTube URLs, retrieves the video transcript,
-title, and channel name (using yt_dlp with cookies if needed), creates a Google Doc for each video,
-and then marks the URL as processed.
+title, and channel name (using yt_dlp with cookies and a custom user-agent if needed),
+creates a Google Doc for each video, and then marks the URL as processed.
 """
 
 import os
@@ -77,17 +77,25 @@ def extract_video_id(url):
 def get_video_info(url):
     """
     Use yt_dlp to get video title and channel (uploader) name.
-    Uses cookies if available to bypass YouTube's bot check.
+    Uses cookies (if available) and sets a user-agent to bypass YouTube's bot check.
     """
     try:
         import yt_dlp
         logging.info("Using yt_dlp for video info retrieval.")
-        ydl_opts = {'quiet': True, 'no_warnings': True}
+        ydl_opts = {
+            'quiet': True,
+            'no_warnings': True,
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) '
+                          'Chrome/112.0.0.0 Safari/537.36'
+        }
+        # Check for cookies via environment variable YOUTUBE_COOKIES
         cookies_env = os.environ.get("YOUTUBE_COOKIES")
         if cookies_env:
             cookies_filename = "youtube_cookies.txt"
             with open(cookies_filename, "w", encoding="utf-8") as f:
                 f.write(cookies_env)
+            # Log the first few lines for debugging (do not expose sensitive data in production)
             with open(cookies_filename, "r", encoding="utf-8") as f:
                 first_lines = "".join([f.readline() for _ in range(5)])
             logging.info(f"Cookies file written. First lines:\n{first_lines}")
