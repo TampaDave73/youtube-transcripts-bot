@@ -36,21 +36,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "type": "object",
-                    "properties": {
-                      "document_id": {
-                        "type": "string",
-                        "description": "The ID of the Google Document."
-                      },
-                      "document_name": {
-                        "type": "string",
-                        "description": "The name of the Google Document."
-                      },
-                      "content": {
-                        "type": "string",
-                        "description": "The full transcript content of the document."
-                      }
-                    }
+                    "$ref": "#/components/schemas/Transcript"
                   }
                 }
               }
@@ -61,12 +47,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -76,12 +57,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  }
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -90,5 +66,34 @@
       }
     }
   },
-  "components": {}
+  "components": {
+    "schemas": {
+      "Transcript": {
+        "type": "object",
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "description": "The ID of the Google Document."
+          },
+          "document_name": {
+            "type": "string",
+            "description": "The name of the Google Document."
+          },
+          "content": {
+            "type": "string",
+            "description": "The full transcript content of the document."
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Description of the error."
+          }
+        }
+      }
+    }
+  }
 }
