@@ -22,7 +22,7 @@ drive_service = build("drive", "v3", credentials=credentials)
 docs_service = build("docs", "v1", credentials=credentials)
 
 def get_google_doc_content(doc_id):
-    """Retrieve the content of a Google Doc by ID."""
+    """Retrieve the content of a Google Doc."""
     try:
         doc = docs_service.documents().get(documentId=doc_id).execute()
         content = "\n".join([element["paragraph"]["elements"][0]["textRun"]["content"]
@@ -35,7 +35,6 @@ def get_google_doc_content(doc_id):
 def get_all_docs_from_folder(folder_id):
     """Retrieve all Google Docs from a specific Google Drive folder."""
     try:
-        # Query for all Google Docs in the folder
         query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.document'"
         results = drive_service.files().list(q=query, fields="files(id, name)").execute()
         files = results.get("files", [])
@@ -59,9 +58,9 @@ def get_all_docs_from_folder(folder_id):
     except Exception as e:
         return {"error": f"Failed to retrieve documents from folder: {str(e)}"}
 
-@app.route("/read_docs_from_folder", methods=["GET"])
-def read_docs_from_folder():
-    """API endpoint to fetch all Google Docs in a folder."""
+@app.route("/fetch_transcripts", methods=["GET"])
+def fetch_transcripts():
+    """API endpoint to get all Google Docs from a folder for CustomGPT."""
     folder_id = request.args.get("folder_id")
     if not folder_id:
         return jsonify({"error": "Missing folder ID"}), 400
@@ -71,7 +70,7 @@ def read_docs_from_folder():
 
 @app.route("/")
 def home():
-    return "YouTube Transcripts Bot API is running!", 200
+    return "CustomGPT YouTube Transcripts API is running!", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
