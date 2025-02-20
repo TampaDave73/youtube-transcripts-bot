@@ -11,7 +11,12 @@ import re
 import logging
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
+from youtube_transcript_api import (
+    YouTubeTranscriptApi,
+    TranscriptsDisabled,
+    NoTranscriptFound,
+    VideoUnavailable
+)
 
 # Set up logging for progress and errors
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -69,7 +74,6 @@ def extract_video_id(url):
         logging.error(f"Could not extract video ID from URL: {url}")
         return None
 
-logging.info("Using yt_dlp for video info retrieval")
 def get_video_info(url):
     """
     Use yt_dlp to get video title and channel (uploader) name.
@@ -79,20 +83,17 @@ def get_video_info(url):
         import yt_dlp
         logging.info("Using yt_dlp for video info retrieval.")
         ydl_opts = {'quiet': True, 'no_warnings': True}
-        # Check for cookies via environment variable YOUTUBE_COOKIES
         cookies_env = os.environ.get("YOUTUBE_COOKIES")
         if cookies_env:
             cookies_filename = "youtube_cookies.txt"
             with open(cookies_filename, "w", encoding="utf-8") as f:
                 f.write(cookies_env)
-            # For debugging, log the first few lines of the cookies file (do not log sensitive info in production)
             with open(cookies_filename, "r", encoding="utf-8") as f:
                 first_lines = "".join([f.readline() for _ in range(5)])
             logging.info(f"Cookies file written. First lines:\n{first_lines}")
             ydl_opts['cookies'] = cookies_filename
             logging.info("Using cookies from environment variable.")
         else:
-            # If a local cookies file exists, use it.
             if os.path.exists("youtube_cookies.txt"):
                 ydl_opts['cookies'] = "youtube_cookies.txt"
                 logging.info("Using local youtube_cookies.txt file for cookies.")
@@ -137,7 +138,6 @@ def create_google_doc(doc_title, content):
         doc = docs_service.documents().create(body=doc_body).execute()
         doc_id = doc.get('documentId')
         logging.info(f"Created Google Doc with ID: {doc_id}")
-
         requests = [
             {
                 'insertText': {
@@ -148,7 +148,6 @@ def create_google_doc(doc_title, content):
         ]
         docs_service.documents().batchUpdate(documentId=doc_id, body={'requests': requests}).execute()
         logging.info("Content inserted into the document.")
-
         file = drive_service.files().get(fileId=doc_id, fields='parents').execute()
         previous_parents = ",".join(file.get('parents'))
         drive_service.files().update(
@@ -195,14 +194,40 @@ def process_sheet():
         if not values or len(values) < 2:
             logging.info("No data found or only header present.")
             return
-
         header = values[0]
         rows = values[1:]
         logging.info(f"Found {len(rows)} data rows.")
-
         for index, row in enumerate(rows):
             if len(row) > PROCESSED_COLUMN_INDEX and row[PROCESSED_COLUMN_INDEX].strip():
                 logging.info(f"Row {index + 2} already processed; skipping.")
                 continue
+            url = row[URL_COLUMN_INDEX].strip() if len(row) > URL_COLUMN_INDEX else None
+            if not url:
+                logging.warning(f"Row {index + 2} does not contain a URL; skipping.")
+                continue
+            logging.info(f"Processing row {index + 2}: {url}")
+            video_id = extract_video_id(url)
+            if not video_id:
+                update_sheet_row(index, "Error: Invalid URL")
+                continue
+            title, channel = get_video_info(url)
+            if not title or not channel:
+                update_sheet_row(index, "Error: Unable to retrieve video info")
+                continue
+            transcript = get_transcript(video_id)
+            if not transcript:
+                update_sheet_row(index, "Error: No transcript found")
+                continue
+            doc_content = f"Title: {title}\nChannel: {channel}\n\nTranscript:\n{transcript}"
+            doc_id = create_google_doc(title, doc_content)
+            if doc_id:
+                update_sheet_row(index, "Processed")
+            else:
+                update_sheet_row(index, "Error: Doc creation failed")
+    except Exception as e:
+        logging.error(f"Error processing sheet: {e}")
 
-       
+if __name__ == "__main__":
+    logging.info("Starting processing of Google Sheet...")
+    process_sheet()
+    logging.info("Processing complete.")
