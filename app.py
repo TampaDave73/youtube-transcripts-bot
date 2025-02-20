@@ -1,6 +1,6 @@
 import os
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -58,22 +58,9 @@ def get_all_docs_from_folder(folder_id):
     except Exception as e:
         return {"error": f"Failed to retrieve documents from folder: {str(e)}"}
 
-@app.route("/fetch_transcripts", methods=["GET"])
-def fetch_transcripts():
-    """API endpoint to get all Google Docs from a folder for CustomGPT."""
-    folder_id = request.args.get("folder_id")
-    if not folder_id:
-        return jsonify({"error": "Missing folder ID"}), 400
-
-    docs = get_all_docs_from_folder(folder_id)
-    return jsonify(docs)
-
 @app.route("/")
 def home():
     return "CustomGPT YouTube Transcripts API is running!", 200
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
 
 @app.route("/fetch_transcripts", methods=["GET"])
 def fetch_transcripts():
@@ -84,7 +71,14 @@ def fetch_transcripts():
     print(f"Received request from OpenAI: folder_id={folder_id}")
 
     if not folder_id:
-        return jsonify({"error": "Missing folder ID"}), 400
+        return Response(json.dumps({"error": "Missing folder ID"}), mimetype="application/json"), 400
 
     docs = get_all_docs_from_folder(folder_id)
-    return jsonify(docs)
+
+    # Log response for debugging
+    print(f"Returning {len(docs)} documents")
+
+    return Response(json.dumps(docs), mimetype="application/json")
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
