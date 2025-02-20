@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 This script reads a Google Sheet for new YouTube URLs, retrieves the video transcript,
-title, and channel name (using yt_dlp), creates a Google Doc for each video, and then marks the URL as processed.
+title, and channel name (using yt_dlp with cookies if needed), creates a Google Doc for each video,
+and then marks the URL as processed.
 """
 
 import os
@@ -71,10 +72,25 @@ def extract_video_id(url):
 def get_video_info(url):
     """
     Use yt_dlp to get video title and channel (uploader) name.
+    Uses cookies if available to bypass YouTube's bot check.
     """
     try:
         import yt_dlp
+        logging.info("Using yt_dlp for video info retrieval.")
         ydl_opts = {'quiet': True, 'no_warnings': True}
+        # Check for cookies via environment variable YOUTUBE_COOKIES
+        cookies_env = os.environ.get("YOUTUBE_COOKIES")
+        if cookies_env:
+            cookies_filename = "youtube_cookies.txt"
+            with open(cookies_filename, "w", encoding="utf-8") as f:
+                f.write(cookies_env)
+            ydl_opts['cookies'] = cookies_filename
+            logging.info("Using cookies from environment variable.")
+        else:
+            # If a local cookies file exists, use it.
+            if os.path.exists("youtube_cookies.txt"):
+                ydl_opts['cookies'] = "youtube_cookies.txt"
+                logging.info("Using local youtube_cookies.txt file for cookies.")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
             title = info.get('title')
