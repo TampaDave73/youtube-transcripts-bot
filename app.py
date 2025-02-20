@@ -30,16 +30,19 @@ def get_google_doc_content(doc_id):
                              if "paragraph" in element and "elements" in element["paragraph"]])
         return content
     except Exception as e:
+        print(f"ERROR: Retrieving document {doc_id} failed: {str(e)}")
         return f"Error retrieving document {doc_id}: {str(e)}"
 
 def get_all_docs_from_folder(folder_id):
     """Retrieve all Google Docs from a specific Google Drive folder."""
     try:
+        print(f"INFO: Fetching all documents from folder: {folder_id}")
         query = f"'{folder_id}' in parents and mimeType='application/vnd.google-apps.document'"
         results = drive_service.files().list(q=query, fields="files(id, name)").execute()
         files = results.get("files", [])
 
         if not files:
+            print("WARNING: No Google Docs found in the specified folder.")
             return {"message": "No Google Docs found in this folder."}
 
         docs_data = []
@@ -53,32 +56,35 @@ def get_all_docs_from_folder(folder_id):
                 "content": doc_content
             })
 
+        print(f"INFO: Returning {len(docs_data)} documents.")
         return docs_data
 
     except Exception as e:
+        print(f"ERROR: Failed to retrieve documents from folder: {str(e)}")
         return {"error": f"Failed to retrieve documents from folder: {str(e)}"}
-
-@app.route("/")
-def home():
-    return "CustomGPT YouTube Transcripts API is running!", 200
 
 @app.route("/fetch_transcripts", methods=["GET"])
 def fetch_transcripts():
     """API endpoint to get all Google Docs from a folder for CustomGPT."""
     folder_id = request.args.get("folder_id")
 
-    # Log the request for debugging
-    print(f"Received request from OpenAI: folder_id={folder_id}")
+    # **Explicit Debugging Logs**
+    print(f"DEBUG: Received request for folder ID: {folder_id}")
 
     if not folder_id:
+        print("ERROR: Missing folder ID in request.")
         return Response(json.dumps({"error": "Missing folder ID"}), mimetype="application/json"), 400
 
     docs = get_all_docs_from_folder(folder_id)
 
-    # Log response for debugging
-    print(f"Returning {len(docs)} documents")
+    # **Log response count**
+    print(f"DEBUG: Returning {len(docs)} transcripts.")
 
     return Response(json.dumps(docs), mimetype="application/json")
+
+@app.route("/")
+def home():
+    return "CustomGPT YouTube Transcripts API is running!", 200
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
